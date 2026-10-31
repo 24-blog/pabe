@@ -6,3 +6,6 @@
 
 ⚠️COPYRIGHT<br>
 All non-code text authored by the repository owner is licensed under CC0 1.0 Universal. (Data: Public domain)
+
+Original government documents remain subject to their
+respective copyright and usage terms.
