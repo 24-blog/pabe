@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>生活保護受給額試算ツール (令和8年10月基準)</title>
+<style>
+:root {
+  --bg: #fafaf7;
+  --fg: #1d1d1b;
+  --mut: #6b6b66;
+  --card: #ffffff;
+  --bd: #d9d8d2;
+  --ac: #2f5d8a;
+  --ac2: #e8f0f8;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17181a;
+    --fg: #e8e8e4;
+    --mut: #9a9a94;
+    --card: #1f2124;
+    --bd: #383a3e;
+    --ac: #7fb0e0;
+    --ac2: #232b34;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17181a;
+  --fg: #e8e8e4;
+  --mut: #9a9a94;
+  --card: #1f2124;
+  --bd: #383a3e;
+  --ac: #7fb0e0;
+  --ac2: #232b34;
+}
+html { background: var(--bg); }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.6 "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif;
+}
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px;
+}
+h1 { font-size: 1.2rem; margin: .2em 0 .6em; }
+h2 { font-size: 1rem; margin: 0 0 .6em; color: var(--ac); }
+section {
+  background: var(--card);
+  border: 1px solid var(--bd);
+  border-radius: 10px;
+  padding: 14px;
+  margin: 12px 0;
+}
+label {
+  display: inline-flex;
+  flex-direction: column;
+  font-size: .8rem;
+  color: var(--mut);
+  margin: 0 10px 8px 0;
+  gap: 2px;
+}
+label.chk {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg);
+  font-size: .9rem;
+}
+input, select {
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--bd);
+  border-radius: 6px;
+  padding: 6px 8px;
+  max-width: 100%;
+}
+input[type=number] { width: 8.5em; }
+input.age { width: 5em; }
+.mem {
+  border-top: 1px dashed var(--bd);
+  padding-top: 8px;
+  margin-top: 6px;
+}
+button {
+  font: inherit;
+  border: 1px solid var(--ac);
+  background: var(--ac2);
+  color: var(--ac);
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+table { width: 100%; border-collapse: collapse; }
+td {
+  padding: 5px 4px;
+  border-bottom: 1px solid var(--bd);
+  vertical-align: top;
+}
+td:last-child {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+tr.sum td {
+  font-weight: 700;
+  font-size: 1.05rem;
+  background: var(--ac2);
+}
+.n {
+  font-size: .78rem;
+  color: var(--mut);
+  display: block;
+  white-space: normal;
+  text-align: left;
+}
+.warn { font-size: .8rem; color: var(--mut); }
+a { color: var(--ac); }
+</style>
+</head>
+<body>
+<main>
+<h1>生活保護受給額試算ツール</h1>
+<p class="warn">厚生労働省の「<a href="https://www.mhlw.go.jp/content/001152601.pdf" target="_blank" rel="noopener noreferrer">生活扶助基準額の算出方法(令和8年10月)</a>」の数値に基づく簡易試算です。実際の認定額は福祉事務所が決定します。</p>
+
+<section>
+<h2>世帯</h2>
+<label>級地区分
+  <select id="grade">
+    <option value="0">1級地-1</option>
+    <option value="1">1級地-2</option>
+    <option value="2">2級地-1</option>
+    <option value="3">2級地-2</option>
+    <option value="4">3級地-1</option>
+    <option value="5">3級地-2</option>
+  </select>
+</label>
+<label class="chk"><input type="checkbox" id="boshi">母子世帯等(母子加算を適用)</label>
+<div id="members"></div>
+<button id="add" type="button">+ 世帯員を追加</button>
+</section>
+
+<section>
+<h2>住宅・その他(手入力)</h2>
+<label>実際の家賃・地代(月)<input type="number" id="rent" value="0" min="0"></label>
+<label>住宅扶助の上限額(月)<input type="number" id="cap" value="53700" min="0"></label>
+<label>介護費の平均月額 E<input type="number" id="e" value="0" min="0"></label>
+<label>医療費の平均月額 F<input type="number" id="f" value="0" min="0"></label>
+<label>収入認定額(月)<input type="number" id="inc" value="0" min="0"></label>
+<p class="warn">※上限額の初期値は東京都・単身の例(1級地 53,700円)です。お住まいの地域・世帯人数に応じた上限額に入力し直してください。収入認定額は勤労控除等を差し引いた後の金額を入力してください。</p>
+</section>
+
+<section>
+<h2>結果</h2>
+<table id="out"></table>
+<p class="warn" id="notes"></p>
+</section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const yen = v => Math.round(v).toLocaleString("ja-JP") + "円";
+
+// 第1類基準額 [0-2, 3-5, 6-11, 12-17, 18-19, 20-40, 41-59, 60-64, 65-69, 70-74, 75+]
+const G1_TABLE = [
+  [44580, 43240, 41460, 39680, 39230, 37000], // 0-2
+  [44580, 43240, 41460, 39680, 39230, 37000], // 3-5
+  [46460, 45060, 43200, 41350, 40880, 38560], // 6-11
+  [49270, 47790, 45820, 43850, 43360, 40900], // 12-17
+  [46930, 45520, 43640, 41760, 41290, 38950], // 18-19
+  [46930, 45520, 43640, 41760, 41290, 38950], // 20-40
+  [46930, 45520, 43640, 41760, 41290, 38950], // 41-59
+  [46930, 45520, 43640, 41760, 41290, 38950], // 60-64
+  [46460, 45060, 43200, 41350, 40880, 38560], // 65-69
+  [46460, 45060, 43200, 41350, 40880, 38560], // 70-74
+  [39890, 38690, 37100, 35500, 35100, 33110]  // 75+
+];
+
+// 逓減率 (1〜6人以上)
+const R = [1.0000, 0.8700, 0.7500, 0.6600, 0.5900, 0.5800];
+
+// 第2類基準額 (1〜5人以上)
+const G2 = [27790, 38060, 44730, 48900, 49180];
+
+// 障害者加算 [1級地, 2級地, 3級地]
+const DIS = [
+  null,
+  [27460, 25540, 23620], // 1・2級
+  [18300, 17020, 15750]  // 3級
+];
+
+// 母子加算 [1級地, 2級地, 3級地]
+const B1 = [18800, 17400, 16100];
+const B2 = [23600, 21800, 20200];
+const B3 = [2900, 2700, 2500];
+
+// 教育扶助基準額
+const EDU = { e: 3400, m: 5300, h: 7300 };
+
+// 年齢バンドインデックス取得
+function getBand(age) {
+  if (age <= 2) return 0;
+  if (age <= 5) return 1;
+  if (age <= 11) return 2;
+  if (age <= 17) return 3;
+  if (age <= 19) return 4;
+  if (age <= 40) return 5;
+  if (age <= 59) return 6;
+  if (age <= 64) return 7;
+  if (age <= 69) return 8;
+  if (age <= 74) return 9;
+  return 10;
+}
+
+// 別表(1) 生活扶助本体に係る経過的加算表 [世帯人数(1-5)][年齢バンド(0-10)][級地(0-5)]
+const K_TABLE = {
+  1: { 6: [20,0,0,0,0,0], 8: [130,0,0,0,0,0], 10: [1720,0,0,0,0,0] },
+  2: { 10: [0,0,0,210,0,0] },
+  3: { 4: [790,0,0,0,0,0] },
+  4: { 3: [730,0,0,0,0,0], 4: [2270,1050,130,0,0,0], 5: [740,0,0,0,0,0] },
+  5: { 0: [840,340,0,0,0,0], 3: [2310,1220,410,0,0,0], 4: [3690,2560,1700,850,0,0], 5: [2230,1180,380,0,0,0], 6: [560,0,0,0,0,0], 10: [130,0,0,0,0,0] }
+};
+
+function autoSch(age) {
+  if (age >= 6 && age <= 11) return "e";
+  if (age >= 12 && age <= 14) return "m";
+  if (age >= 15 && age <= 17) return "h";
+  return "";
+}
+
+let M = [{ age: 40, dis: 0, hosp: false, sch: "", kid: false }];
+
+function rows() {
+  $("members").innerHTML = M.map((m, i) => `
+    <div class="mem" data-i="${i}">
+      <b>${i + 1}人目</b><br>
+      <label>年齢<input type="number" class="age" min="0" max="120" value="${m.age}"></label>
+      <label>障害<select class="dis">
+        <option value="0">なし</option>
+        <option value="1">1・2級</option>
+        <option value="2">3級</option>
+      </select></label>
+      <label>就学<select class="sch">
+        <option value="">なし</option>
+        <option value="e">小学生</option>
+        <option value="m">中学生</option>
+        <option value="h">高校生</option>
+      </select></label>
+      <label class="chk"><input type="checkbox" class="kid">児童(18歳年度末まで)</label>
+      <label class="chk"><input type="checkbox" class="hosp">入院・施設入所</label>
+      ${M.length > 1 ? '<button type="button" class="del">削除</button>' : ""}
+    </div>
+  `).join("");
+
+  document.querySelectorAll(".mem").forEach((el, i) => {
+    el.querySelector(".dis").value = M[i].dis;
+    el.querySelector(".sch").value = M[i].sch;
+    el.querySelector(".hosp").checked = M[i].hosp;
+    el.querySelector(".kid").checked = M[i].kid;
+  });
+}
+
+function getBoshiKeika(n, childAge, g) {
+  const nn = Math.min(n, 5);
+  if (nn < 3) return 0;
+  
+  // 3人世帯
+  if (nn === 3) {
+    if (childAge <= 5) return [3330, 3330, 0, 0, 0, 0][g];
+    if (childAge <= 11) return [3330, 3330, 3200, 0, 0, 0][g];
+    if (childAge <= 14) return [3330, 3330, 3200, 2780, 1760, 0][g];
+    if (childAge <= 17) return 0;
+    if (childAge < 20) return [3330, 3330, 3200, 2780, 1760, 0][g];
+  }
+  // 4人世帯
+  if (nn === 4) {
+    if (childAge <= 2) return [3330, 3330, 3200, 3200, 2900, 0][g];
+    if (childAge <= 14) return [3330, 3330, 3200, 3200, 2900, 2900][g];
+    if (childAge <= 17) return 0;
+    if (childAge < 20) return [3330, 3330, 3200, 3200, 2900, 2900][g];
+  }
+  // 5人以上世帯
+  if (nn >= 5) {
+    if (childAge <= 14) return [3330, 3330, 3200, 3200, 2900, 2900][g];
+    if (childAge <= 17) return 0;
+    if (childAge < 20) return [3330, 3330, 3200, 3200, 2900, 2900][g];
+  }
+  return 0;
+}
+
+function calc() {
+  const g = +$("grade").value;
+  const cl = Math.floor(g / 2); // 1級地:0, 2級地:1, 3級地:2
+  const act = M.filter(m => !m.hosp);
+  const n = act.length;
+  const notes = [];
+
+  if (!n) {
+    $("out").innerHTML = "<tr><td colspan='2'>入院・施設入所者を除いた世帯員が0人のため計算できません。</td></tr>";
+    return;
+  }
+
+  const nn = Math.min(n, 5);
+
+  // 1. 生活扶助 第1類 & 経過的加算(本体)
+  let s1 = 0;
+  let kei = 0;
+  act.forEach(m => {
+    const bi = getBand(m.age);
+    s1 += G1_TABLE[bi][g];
+    if (K_TABLE[nn] && K_TABLE[nn][bi]) {
+      kei += K_TABLE[nn][bi][g] || 0;
+    }
+  });
+
+  const r = n >= 6 ? 0.5800 : R[n - 1];
+  const base = Math.floor(s1 * r);
+  const g2 = G2[nn - 1];
+  const tok = 2500 * n;
+  const A = base + g2 + tok + kei;
+
+  // 2. 加算額 B
+  // 障害者加算
+  const dis = act.reduce((s, m) => s + (m.dis ? DIS[m.dis][cl] : 0), 0);
+  
+  // 母子加算
+  const kids = act.filter(m => m.kid && m.age <= 19).sort((a, b) => b.age - a.age);
+  const kCount = kids.length;
+  let bo = 0;
+  let k2 = 0;
+
+  if ($("boshi").checked && kCount > 0) {
+    if (kCount === 1) bo = B1[cl];
+    else if (kCount === 2) bo = B2[cl];
+    else bo = B2[cl] + (kCount - 2) * B3[cl];
+
+    // 母子加算の経過的加算（児童1人のみかつ3人以上世帯）
+    if (kCount === 1 && n >= 3) {
+      k2 = getBoshiKeika(n, kids[0].age, g);
+    }
+  }
+
+  const kasan = Math.max(dis, bo); // 併給不可（原則）
+
+  // 児童養育加算 (児童1人につき10,190円)
+  const yo = 10190 * kCount;
+
+  // 児童養育加算に係る経過的加算
+  let el = 0;
+  if (n <= 3) {
+    el += M.filter(m => m.hosp && m.age < 3).length; // 入院中3歳未満
+  } else {
+    el += act.filter(m => m.age < 3).length;
+  }
+  
+  // 第3子以降の3歳〜小学生修了前（11歳まで）
+  kids.forEach((m, idx) => {
+    if (idx >= 2 && m.age >= 3 && m.age <= 11) {
+      el++;
+    }
+  });
+  
+  const k3 = 4330 * el;
+  const B = kasan + yo + k2 + k3;
+
+  // 3. 住宅扶助 C
+  const C = Math.min(+$("rent").value || 0, +$("cap").value || 0);
+
+  // 4. 教育扶助 D
+  const D = act.reduce((s, m) => s + (EDU[m.sch] || 0), 0);
+
+  // 5. 介護・医療扶助 E, F
+  const E = +$("e").value || 0;
+  const F = +$("f").value || 0;
+
+  // 最低生活費 & 保護費 calculation
+  const tot = A + B + C + D + E + F;
+  const inc = +$("inc").value || 0;
+  const grant = Math.max(0, tot - inc);
+  const cash = Math.max(0, (A + B + C + D) - inc);
+
+  const row = (l, v, s) => `<tr><td>${l}${s ? `<span class="n">${s}</span>` : ""}</td><td>${yen(v)}</td></tr>`;
+
+  $("out").innerHTML =
+    row("第1類（個人経費）合計", s1, `世帯人員${n}人 × 逓減率${r}`) +
+    row("第1類 × 逓減率", base) +
+    row("第2類（世帯経費）", g2) +
+    row("特例加算", tok, "1人当たり月額2,500円") +
+    row("経過的加算(生活扶助本体)", kei) +
+    row("A 生活扶助 合計", A) +
+    row("B 加算額", B, `障害者・母子加算:${yen(kasan)}(併給不可/高額選択) / 児童養育加算:${yen(yo)} / 経過的加算:${yen(k2 + k3)}`) +
+    row("C 住宅扶助", C, "家賃実費と上限額の低い方") +
+    row("D 教育扶助", D) +
+    row("E 介護扶助", E) +
+    row("F 医療扶助", F) +
+    `<tr class="sum"><td>最低生活費 (A+B+C+D+E+F)</td><td>${yen(tot)}</td></tr>` +
+    row("収入認定額", inc) +
+    `<tr class="sum"><td>保護費の給付目安<span class="n">最低生活費 − 収入認定額</span></td><td>${yen(grant)}</td></tr>` +
+    row("うち現金給付額の目安", cash, "医療・介護扶助は原則現物給付のため (A+B+C+D) − 収入");
+
+  if (n >= 6) {
+    notes.push("※6人以上の世帯は、第2類および一部経過的加算を5人世帯の基準額、逓減率を6人基準(0.58)として概算しています。");
+  }
+  notes.push("※児童は「児童」チェックで指定します(17歳以下は自動。18〜19歳は、18歳到達後の最初の3/31までの方を手動でチェック)。");
+  notes.push("※冬季加算、妊産婦加算、一時的な期末加算等は含まれていません。入院・施設入所者は居宅人員から除外して算定します。");
+  $("notes").textContent = notes.join(" ");
+}
+
+document.addEventListener("input", ev => {
+  const el = ev.target.closest(".mem");
+  if (el) {
+    const idx = +el.dataset.i;
+    const m = M[idx];
+    m.age = +el.querySelector(".age").value || 0;
+    m.dis = +el.querySelector(".dis").value;
+    m.hosp = el.querySelector(".hosp").checked;
+    if (ev.target.classList.contains("age")) {
+      m.sch = autoSch(m.age);
+      el.querySelector(".sch").value = m.sch;
+      if (m.age <= 17) m.kid = true;
+      else if (m.age >= 20) m.kid = false;
+      el.querySelector(".kid").checked = m.kid;
+    } else {
+      m.sch = el.querySelector(".sch").value;
+      m.kid = el.querySelector(".kid").checked;
+    }
+  }
+  calc();
+});
+
+document.addEventListener("click", ev => {
+  if (ev.target.id === "add") {
+    M.push({ age: 20, dis: 0, hosp: false, sch: "", kid: false });
+    rows();
+    calc();
+  }
+  if (ev.target.classList.contains("del")) {
+    const idx = +ev.target.closest(".mem").dataset.i;
+    M.splice(idx, 1);
+    rows();
+    calc();
+  }
+});
+
+rows();
+calc();
+</script>
+</body>
+</html>
